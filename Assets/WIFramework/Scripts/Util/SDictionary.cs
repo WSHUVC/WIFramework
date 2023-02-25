@@ -1,7 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using Mono.Cecil;
+using System.Collections.Generic;
 using UnityEngine;
 
-namespace WIFramework.Util
+namespace WIFramework
 {
     [System.Serializable]
     public struct SKeyValuePair<T, T2> 
@@ -23,6 +24,44 @@ namespace WIFramework.Util
     {
         [SerializeField] public List<SKeyValuePair<T, T2>> datas=new List<SKeyValuePair<T, T2>>();
         
+        public SDictionary()
+        {
+            foreach(var d in datas)
+            {
+                Add(d.Key, d.Value);
+            }
+        }
+
+        public new T2 this[T key]
+        {
+            get
+            {
+                if(base.Count!= datas.Count)
+                {
+                    foreach(var d in datas)
+                    {
+                        base.TryAdd(d.Key, d.Value);
+                    }
+                }
+
+                return base[key];
+            }
+
+            set
+            {
+                for(int i =0;i<datas.Count;++i)
+                {
+                    var currentData = datas[i];
+                    var ck = currentData.Key;
+                    if (ck.Equals(key))
+                        datas.RemoveAt(i);
+                }
+                
+                datas.Add(new SKeyValuePair<T, T2>(key, value));
+                base[key] = value;
+            }
+        }
+
         public new bool Add(T key, T2 value)
         {
             if (base.ContainsKey(key))

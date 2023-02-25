@@ -11,32 +11,47 @@ namespace WIFramework
         internal static void Initialize()
         {
             codes = Enum.GetValues(typeof(KeyCode));
-            //PlayerLoopInterface.InsertSystemAfter(typeof(Hooker), MonoTracking, typeof(UnityEngine.PlayerLoop.EarlyUpdate.UpdatePreloading));
+            PlayerLoopInterface.InsertSystemAfter(typeof(Hooker), MonoTracking, typeof(UnityEngine.PlayerLoop.EarlyUpdate.UpdatePreloading));
             PlayerLoopInterface.InsertSystemBefore(typeof(Hooker), DetectingKey, typeof(UnityEngine.PlayerLoop.PreUpdate.NewInputUpdate));
             //SetHook();
         }
 
-        //static Queue<MonoBehaviour> registWatingQueue = new Queue<MonoBehaviour>(); 
-        //static void MonoTracking()
-        //{
-        //    if (!Application.isPlaying)
-        //        return;
+        static Queue<MonoBehaviour> afterInitializerList = new Queue<MonoBehaviour>();
+        static Queue<MonoBehaviour> registWatingQueue = new Queue<MonoBehaviour>();
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        static void MonoTracking()
+        {
+            while (registWatingQueue.Count > 0)
+            {
+                var curr = registWatingQueue.Dequeue();
+                if (curr != null)
+                {
+                    WIManager.Regist(curr);
+                    afterInitializerList.Enqueue(curr);
+                }
+            }
+            AfterInitialize();
+        }
 
-        //    while (registWatingQueue.Count > 0)
-        //    {
-        //        var curr = registWatingQueue.Dequeue();
-        //        if (curr != null)
-        //            WIManager.Regist(curr);
-        //    }
-        //}
+        static void AfterInitialize()
+        {
+            foreach (var i in afterInitializerList)
+                i.Initialize();
+            
+            while(afterInitializerList.Count>0)
+            {
+                var curr = afterInitializerList.Dequeue();
+                if (curr == null)
+                    continue;
 
-        //internal static void RegistReady(MonoBehaviour monoBehaviour)
-        //{
-        //    if (!Application.isPlaying)
-        //        return;
+                curr.AfterInitialize();
+            }
+        }
 
-        //    registWatingQueue.Enqueue(monoBehaviour);
-        //}
+        internal static void RegistReady(MonoBehaviour target)
+        {
+            registWatingQueue.Enqueue(target);
+        }
 
         static void DetectingKey()
         {

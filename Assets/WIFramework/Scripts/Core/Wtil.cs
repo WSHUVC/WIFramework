@@ -8,9 +8,52 @@ namespace WIFramework
 {
     public static class Wtil
     {
+#if UNITY_EDITOR
+        public static bool GetCurrentSelectGameObject(out GameObject obj)
+        {
+            obj = Selection.activeGameObject;
+            if (obj == null)
+                return false;
+            return true;
+        }
+#endif
+        public static int GetLayer(this Layers layer)
+        {
+            return LayerMask.NameToLayer(layer.ToString());
+        }
+        
+        public static void AddLayer(this Camera cam, int layer)
+        {
+            cam.cullingMask |= 1 << layer;
+        }
+
+        public static void RemoveLayer(this Camera cam, int layer)
+        {
+            cam.cullingMask &= ~(1 << layer);
+        }
+
         public static FieldInfo[] GetAllFields(this Type target)
         {
             return target.GetFields(BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public);
+        }
+
+        public static void NullCleaning<T,T2>(this Dictionary<T,T2> table)
+        {
+            var keys = table.Keys;
+
+            foreach(var k in keys)
+            {
+                if (k == null)
+                {
+                    table.Remove(k);
+                    continue;
+                }
+
+                if (table[k] == null)
+                {
+                    table.Remove(k);
+                }
+            }
         }
 
         /// <summary>
@@ -62,8 +105,8 @@ namespace WIFramework
         {
             if (target.TryGetComponent<T>(out var result))
                 return result;
-
-            return target.AddComponent<T>();
+            result = target.AddComponent<T>();
+            return result;
         }
     }
 }

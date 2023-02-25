@@ -9,7 +9,7 @@ namespace WIFramework
 {
     public static partial class WIManager
     {
-        static Dictionary<MonoBehaviour, GameObject> wiTable = new Dictionary<MonoBehaviour, GameObject>();
+        internal static Dictionary<MonoBehaviour, GameObject> monoTable = new Dictionary<MonoBehaviour, GameObject>();
         static Dictionary<int, MonoBehaviour> singleTable = new Dictionary<int, MonoBehaviour>();
         internal static HashSet<IGetKey> getKeyActors = new HashSet<IGetKey>();
         internal static HashSet<IGetKeyUp> getKeyUpActors = new HashSet<IGetKeyUp>();
@@ -18,9 +18,10 @@ namespace WIFramework
         static WIManager()
         {
             Debug.Log($"WISystem Awake");
-            wiTable.Clear();
-            singleTable.Clear();
-            diWaitingTable.Clear();
+            
+            monoTable.NullCleaning();
+            singleTable.NullCleaning();
+            diWaitingTable.NullCleaning();
 
             getKeyActors.Clear();
             getKeyUpActors.Clear();
@@ -28,15 +29,13 @@ namespace WIFramework
         }
         internal static void Regist(MonoBehaviour mb)
         {
-            if (wiTable.ContainsKey(mb))
-                return;
-
             if (mb is ISingle)
             {
                 if (!RegistSingleBehaviour(mb))
                     return;
             }
-            wiTable.Add(mb, mb.gameObject);
+            Debug.Log($"Regist {mb.name}");
+            monoTable.TryAdd(mb, mb.gameObject);
 
             if(mb is IKeyboardActor)
             {
@@ -50,11 +49,23 @@ namespace WIFramework
                     getKeyDownActors.Add(gd);
             }
             Injection(mb);
-            mb.Initialize();
         }
+        
+        public static void FindSingleBehaviour<T>(out T result) where T : MonoBehaviour
+        {
+            var hashCode = typeof(T).GetHashCode();
+            if (singleTable.TryGetValue(hashCode, out var mb))
+            {
+                result = (T)mb;
+                return;
+            }
+            result = default;
+        }
+
         internal static void Unregist(MonoBehaviour mb)
         {
-            wiTable.Remove(mb);
+            Debug.Log($"Unregist:{mb.name}");
+            monoTable.Remove(mb);
             if (mb is ISingle sb)
                 singleTable.Remove(mb.GetHashCode());
             if (mb is IKeyboardActor)
@@ -79,7 +90,7 @@ namespace WIFramework
                 if (singleTable[hashCode].GetHashCode()!= mb.GetHashCode())
                 {
                     //Debug.Log($"Move To Trash");
-                    MoveToTrash(mb, singleTable[hashCode]);
+                    TrashThrow(mb, singleTable[hashCode]);
                     return false;
                 }
                 return true;
@@ -105,7 +116,7 @@ namespace WIFramework
             }
             return true;
         }
-        static void Injection(MonoBehaviour mb)
+        internal static void Injection(MonoBehaviour mb)
         {
             var wiType = mb.GetType();
             var targetFields = wiType.GetAllFields();
@@ -115,10 +126,13 @@ namespace WIFramework
 
             List<UIBehaviour> uiElements = new List<UIBehaviour>();
             List<Transform> childTransforms = new List<Transform>();
-            
+
             //Filtering 
-            foreach(var c in childs)
+            foreach (var c in childs)
             {
+                if (c == null)
+                    continue;
+                
                 var cType = c.GetType();
                 if (cType.IsSubclassOf(typeof(UIBehaviour)))
                 {
@@ -133,9 +147,9 @@ namespace WIFramework
                 }
             }
 
-            //Injecting
             foreach (var f in targetFields)
             {
+                #region LabelInjection
                 Label label = (Label)f.GetCustomAttribute(typeof(Label));
                 if (label != null)
                 {
@@ -150,7 +164,9 @@ namespace WIFramework
                         }
                     }
                 }
+                #endregion
 
+                #region ISingleInjection
                 if (f.FieldType.GetInterface(nameof(ISingle)) != null)
                 {
                     //Debug.Log($"{wi} in ISingle.");
@@ -172,25 +188,47 @@ namespace WIFramework
 
                     continue;
                 }
-
+                #endregion
+                
+                #region UIBehaviourInjection
                 if (f.FieldType.IsSubclassOf(typeof(UIBehaviour)))
                 {
                     InjectNameAndType(uiElements, f, mb);
                     continue;
                 }
+                #endregion
 
+                #region TransformInjection
                 if (f.FieldType.IsSubclassOf(typeof(Transform)) || f.FieldType.Equals(typeof(Transform)))
                 {
                     InjectNameAndType(childTransforms, f, mb);
                     continue;
                 }
+                #endregion
+
+                if (f.FieldType.IsGenericType)
+                {
+                    if (f.FieldType.GetGenericTypeDefinition().Equals(typeof(Container<>)))
+                    {
+                        var loadType = f.FieldType.GetGenericArguments()[0];
+                        var containerType = typeof(Container<>).MakeGenericType(new Type[] { loadType });
+                        var container = Activator.CreateInstance(containerType);
+
+                        var stuffs = childs
+                            .Where(c => loadType.Equals(c.GetType()));
+
+                        container.GetType().GetMethod("Loading").Invoke(container, new object[] { stuffs });
+                        f.SetValue(mb, container);
+                    }
+                }
+
             }
         }
-        static void MoveToTrash(MonoBehaviour target, MonoBehaviour origin)
+        static void TrashThrow(MonoBehaviour target, MonoBehaviour origin)
         {
             var trash = target.gameObject.TryAddComponent<TrashBehaviour>();
             trash.originBehaviour = origin; 
-            wiTable.Remove(target);
+            monoTable.Remove(target);
             GameObject.Destroy(target);
         }
         static void InjectNameAndType<T>(List<T> arr, FieldInfo info, MonoBehaviour target) where T : Component

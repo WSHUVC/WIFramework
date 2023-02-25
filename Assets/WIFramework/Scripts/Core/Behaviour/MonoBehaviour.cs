@@ -1,19 +1,25 @@
-﻿using WIFramework;
+﻿using UnityEngine;
+using UnityEngine.Rendering;
+using WIFramework;
 
 public class MonoBehaviour : UnityEngine.MonoBehaviour
 {
-    protected virtual void Awake()
+    public MonoBehaviour()
     {
-        //Hooker.RegistReady(this);
-        WIManager.Regist(this);
+        if (this.GetType() != typeof(TrashBehaviour))
+            Hooker.RegistReady(this);
     }
     public virtual void Initialize()
+    {
+    }
+    
+    public virtual void AfterInitialize()
     {
     }
 
     private void OnDestroy()
     {
-        WIManager.Unregist(this);
+        if (this.GetType() != typeof(TrashBehaviour))
+            WIManager.Unregist(this);
     }
-
 }

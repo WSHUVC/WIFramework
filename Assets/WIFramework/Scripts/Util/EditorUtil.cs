@@ -6,9 +6,10 @@ using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 
-namespace WIFramework.EditorScripts.Extension
+namespace WIFramework
 {
-    public static class CustomEditorExtenstion
+    public class EditorUtil
     {
+        
     }
 }
