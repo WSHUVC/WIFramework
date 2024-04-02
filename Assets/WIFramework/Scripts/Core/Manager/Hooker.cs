@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using UnityEngine;
-using UnityEngine.LowLevel;
 namespace WIFramework
 {
     public class Hooker
@@ -16,9 +14,10 @@ namespace WIFramework
             //SetHook();
         }
 
+        static Queue<MonoBehaviour> initializerList = new Queue<MonoBehaviour>();
         static Queue<MonoBehaviour> afterInitializerList = new Queue<MonoBehaviour>();
         static Queue<MonoBehaviour> registWatingQueue = new Queue<MonoBehaviour>();
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        //[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void MonoTracking()
         {
             while (registWatingQueue.Count > 0)
@@ -26,29 +25,30 @@ namespace WIFramework
                 var curr = registWatingQueue.Dequeue();
                 if (curr != null)
                 {
-                    WIManager.Regist(curr);
-                    afterInitializerList.Enqueue(curr);
+                    if (WIManager.Regist(curr))
+                        initializerList.Enqueue(curr);
                 }
             }
-            AfterInitialize();
+            Initializing();
         }
 
-        static void AfterInitialize()
+        static void Initializing()
         {
-            foreach (var i in afterInitializerList)
-                i.Initialize();
-            
-            while(afterInitializerList.Count>0)
+            while (initializerList.Count >0)
+            {
+                var mono = initializerList.Dequeue();
+                mono.Initialize();
+                afterInitializerList.Enqueue(mono);
+            }
+
+            while (afterInitializerList.Count > 0)
             {
                 var curr = afterInitializerList.Dequeue();
-                if (curr == null)
-                    continue;
-
                 curr.AfterInitialize();
             }
         }
 
-        internal static void RegistReady(MonoBehaviour target)
+        public static void RegistReady(MonoBehaviour target)
         {
             registWatingQueue.Enqueue(target);
         }

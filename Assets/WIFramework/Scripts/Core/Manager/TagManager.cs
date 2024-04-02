@@ -1,6 +1,7 @@
 ﻿using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
+
 namespace WIFramework
 {
     public enum Tags
@@ -9,8 +10,8 @@ namespace WIFramework
 
     public enum Layers
     {
-        Visible,
-        FloorGround,
+        TopFloor,
+        DeactiveIcon,
     }
 #if UNITY_EDITOR
     [InitializeOnLoad]

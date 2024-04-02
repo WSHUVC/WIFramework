@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Profiling;
 
 namespace WIFramework
 {
@@ -17,24 +18,25 @@ namespace WIFramework
         static Dictionary<Type, List<MonoBehaviour>> diWaitingTable = new Dictionary<Type, List<MonoBehaviour>>();
         static WIManager()
         {
-            Debug.Log($"WISystem Awake");
-            
             monoTable.NullCleaning();
             singleTable.NullCleaning();
             diWaitingTable.NullCleaning();
-
             getKeyActors.Clear();
             getKeyUpActors.Clear();
             getKeyDownActors.Clear();
         }
-        internal static void Regist(MonoBehaviour mb)
+        internal static bool Regist(MonoBehaviour mb)
         {
+            if (!mb.gameObject.activeInHierarchy)
+                return false;
+
+            //Debug.Log(mb.name);
             if (mb is ISingle)
             {
                 if (!RegistSingleBehaviour(mb))
-                    return;
+                    return false;
             }
-            Debug.Log($"Regist {mb.name}");
+            //Debug.Log($"Regist {mb.name}");
             monoTable.TryAdd(mb, mb.gameObject);
 
             if(mb is IKeyboardActor)
@@ -49,22 +51,22 @@ namespace WIFramework
                     getKeyDownActors.Add(gd);
             }
             Injection(mb);
+            return true;
         }
-        
-        public static void FindSingleBehaviour<T>(out T result) where T : MonoBehaviour
+        public static T FindSingle<T>(this object root) where T : MonoBehaviour, ISingle
         {
             var hashCode = typeof(T).GetHashCode();
+            T result = default(T);
             if (singleTable.TryGetValue(hashCode, out var mb))
             {
                 result = (T)mb;
-                return;
+                return result;
             }
-            result = default;
+            return result;
         }
-
         internal static void Unregist(MonoBehaviour mb)
         {
-            Debug.Log($"Unregist:{mb.name}");
+            //Debug.Log($"Unregist:{mb.name}");
             monoTable.Remove(mb);
             if (mb is ISingle sb)
                 singleTable.Remove(mb.GetHashCode());
@@ -93,7 +95,7 @@ namespace WIFramework
                     TrashThrow(mb, singleTable[hashCode]);
                     return false;
                 }
-                return true;
+                return false;
             }
 
             singleTable.Add(hashCode, mb);
@@ -121,9 +123,7 @@ namespace WIFramework
             var wiType = mb.GetType();
             var targetFields = wiType.GetAllFields();
 
-            List<Component> childs = new List<Component>();
-            mb.transform.Search(ref childs);
-
+            List<Component> childs = mb.transform.FindAll<Component>();
             List<UIBehaviour> uiElements = new List<UIBehaviour>();
             List<Transform> childTransforms = new List<Transform>();
 
@@ -221,12 +221,11 @@ namespace WIFramework
                         f.SetValue(mb, container);
                     }
                 }
-
             }
         }
         static void TrashThrow(MonoBehaviour target, MonoBehaviour origin)
         {
-            var trash = target.gameObject.TryAddComponent<TrashBehaviour>();
+            var trash = target.gameObject.AddComponent<TrashBehaviour>();
             trash.originBehaviour = origin; 
             monoTable.Remove(target);
             GameObject.Destroy(target);
