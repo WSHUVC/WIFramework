@@ -218,7 +218,7 @@ GameObject:
   - component: {fileID: 829938542}
   - component: {fileID: 829938543}
   m_Layer: 0
-  m_Name: SingleWaiting
+  m_Name: IWaiting
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
